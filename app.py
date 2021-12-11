@@ -9,7 +9,7 @@ st.set_page_config(
 PAGES = {
     "🏠 Halaman Utama": home,
 }
-st.sidebar.image("image/logo.png", width=150)
+
 st.sidebar.subheader('Navigasi')
 
 page = st.sidebar.selectbox("Pindah Halaman", list(PAGES.keys()))
