@@ -6,6 +6,4 @@ matplotlib
 plotly
 tweepy
 PySastrawi
-tensorflow
 regex
-keras

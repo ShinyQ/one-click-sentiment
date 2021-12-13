@@ -1,22 +1,10 @@
-import streamlit as st
 import pandas as pd
+import requests
+import streamlit as st
 import tweepy
-import plotly
-from models import preprocessing
-
-from keras.models import load_model
-from tensorflow.keras.preprocessing.text import Tokenizer
-from tensorflow.keras.preprocessing.sequence import pad_sequences
-
-
-def convert_input_to_sequences(text, max_length, model):
-    tokenizer = Tokenizer(num_words=10000, oov_token="<OOV>")
-    tokenizer.fit_on_texts(text)
-
-    sequence = tokenizer.texts_to_sequences(text)
-    sequence_pad = pad_sequences(sequence, maxlen=max_length, padding="post")
-
-    return text, (model.predict(sequence_pad))
+import json
+import plotly.graph_objects as go
+import numpy as np
 
 
 def app():
@@ -34,26 +22,47 @@ def app():
 
         tweets = client.search_recent_tweets(
             query=query, tweet_fields=['context_annotations', 'created_at'],
-            max_results=100
+            max_results=20
         )
 
         tweets = [tweet.text for tweet in tweets.data]
 
         sentiment = []
-        model = load_model('./models/model.h5')
+        negatif = 0
+        positif = 0
 
-        # for i in range(len(tweets)):
-        #     text = preprocessing.preprocessing_data(tweets[i])
-        #     text, result = convert_input_to_sequences([text], 35, model)
-        #
-        #     if result[0][0] > result[0][1]:
-        #         result = 0
-        #     else:
-        #         result = 1
-        #
-        #     sentiment.append([text[0], result])
-        text = preprocessing.preprocessing_data("dia buat konten buka buka area privatnya di depan orang lain itu sama saja dengan lakilaki yang nunjukin area bawahnya sambil ngocok di depan perempuan yang lagi lewat siskaeee ini sebenernya memang sudah harus masuk bui dari dulu")
-        text, result = convert_input_to_sequences([text], 35, model)
+        for data in tweets:
+            response = requests.post("https://oneclick.shinyq.my.id/predict", data=json.dumps({'text': data}))
+            response = response.json().get('data')
 
-        st.write(result)
-        st.write(text)
+            if response.get('predict') == 'Positif':
+                positif += 1
+            else:
+                negatif += 1
+
+            confidence = response.get('confidence')[1]
+
+            if response.get('confidence')[0] > response.get('confidence')[1]:
+                confidence = response.get('confidence')[0]
+
+            sentiment.append([data, response.get('preprocess'), confidence, response.get('predict')])
+
+        df = pd.DataFrame(
+            columns=['Tweet', 'Preprocessing', 'Confidence', 'Prediction'],
+            data=np.array(sentiment)
+        )
+
+        st.table(df)
+
+        fig = go.Figure(data=[go.Pie(labels=["Positif", "Negatif"], values=[positif, negatif])])
+        fig.update_traces(textposition='inside', textinfo='percent+label+value', marker=dict(colors=['green', 'red']), )
+        fig.update_layout(
+            height=500,
+            width=900,
+            title=f'Persentase Sentimen Dari Keyword "{keyword}"',
+            font=dict(
+                size=16,
+            )
+        )
+
+        st.plotly_chart(fig)
